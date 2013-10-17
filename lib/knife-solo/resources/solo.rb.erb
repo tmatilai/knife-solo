@@ -13,5 +13,5 @@ cookbook_path << File.join(base, 'cookbooks-<%= i+1 %>') # <%= path %>
 <% end -%>
 
 <% proxy_settings.each_pair do |k, v| -%>
-<%= k %>     "<%= v %>"
+<%= k %> <%= v.inspect %>
 <% end -%>
