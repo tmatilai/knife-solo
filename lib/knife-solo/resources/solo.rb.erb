@@ -1,17 +1,23 @@
 base = File.expand_path('..', __FILE__)
 
-nodes_path                File.join(base, 'nodes')
-role_path                 File.join(base, 'roles')
-data_bag_path             File.join(base, 'data_bags')
-encrypted_data_bag_secret File.join(base, 'data_bag_key')
-environment_path          File.join(base, 'environments')
-environment               <%= node_environment.inspect %>
+<%
+  def abs_path(path)
+    path && "File.join(base, '#{path[:dest]}') # #{path[:src]}"
+  end
 
-cookbook_path []
-<% cookbook_paths.each_with_index do |path, i| -%>
-cookbook_path << File.join(base, 'cookbooks-<%= i+1 %>') # <%= path %>
-<% end -%>
-
-<% proxy_settings.each_pair do |k, v| -%>
+  solo_rb.paths.each_pair do |key, paths|
+    paths.compact!
+    if paths.length <= 1
+-%>
+<%= key %> <%= abs_path(paths.first) || 'nil' %>
+<%  else -%>
+<%= key %> []
+<%    paths.each do |path| -%>
+<%= key %> << <%= abs_path(path) %>)
+<%    end
+    end
+  end
+-%>
+<% solo_rb.settings.each_pair do |k, v| -%>
 <%= k %> <%= v.inspect %>
 <% end -%>

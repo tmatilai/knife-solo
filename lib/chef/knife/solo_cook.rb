@@ -114,7 +114,7 @@ class Chef
           upload_to_provision_path(path, "/cookbooks-#{i + 1}", 'cookbook_path')
         end
         upload_to_provision_path(node_config, 'dna.json')
-        upload_to_provision_path(nodes_path, 'nodes')
+        upload_to_provision_path(nodes_path, 'nodes', 'nodes_path')
         upload_to_provision_path(:role_path, 'roles')
         upload_to_provision_path(:data_bag_path, 'data_bags')
         upload_to_provision_path(:encrypted_data_bag_secret, 'data_bag_key')
@@ -209,6 +209,24 @@ class Chef
         add_cookbook_path(path) if path
       end
 
+      class SoloRb
+        Path = Struct.new(:src, :dest)
+
+        attr_reader :paths, :settings
+
+        def initialize
+          @paths    = Hash.new { |hash, key| hash[key] = [] }
+          @settings = Hash.new
+        end
+      end
+
+      def solo_rb
+        @solo_rb ||= SoloRb.new.tap do |solo_rb|
+          solo_rb.settings['environment'] = node_environment
+          solo_rb.settings.merge!(proxy_settings)
+        end
+      end
+
       def generate_solorb
         ui.msg "Generating solo config..."
         template = Erubis::Eruby.new(KnifeSolo.resource('solo.rb.erb').read)
@@ -219,19 +237,22 @@ class Chef
         rsync(src, dest)
       end
 
-      def upload_to_provision_path(src, dest, key_name = 'path')
+      def upload_to_provision_path(src, dest, key_name = nil)
         if src.is_a? Symbol
           key_name = src.to_s
           src = Chef::Config[src]
         end
 
+        uploaded = nil
         if src.nil?
           Chef::Log.debug "'#{key_name}' not set"
         elsif !File.exist?(src)
-          ui.warn "Local #{key_name} '#{src}' does not exist"
+          ui.warn "Local #{key_name || 'path'} '#{src}' does not exist"
         else
           upload("#{src}#{'/' if File.directory?(src)}", File.join(provisioning_path, dest))
+          uploaded = SoloRb::Path.new(src, dest)
         end
+        solo_rb.paths[key_name] << uploaded if key_name
       end
 
       # TODO probably can get Net::SSH to do this directly
